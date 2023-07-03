@@ -2,12 +2,12 @@ use macroquad::{
     prelude::Color,
     rand::gen_range,
     shapes::draw_rectangle,
-    window::{next_frame, Conf}, time::{get_frame_time},
+    window::{next_frame, Conf}, time::{get_frame_time, get_time},
 };
 
 const SCREEN_WIDTH: i32 = 1000;
 const SCREEN_HEIGHT: f32 = 1000.0;
-const NUM_NUMBERS: i32 = 100;
+const NUM_NUMBERS: i32 = 1000;
 const TIME_DELAY: f32 = 0.00000000000000;
 const RECTANGLE_WIDTH: f32 = (SCREEN_WIDTH / NUM_NUMBERS) as f32;
 fn window_conf() -> Conf {
@@ -41,6 +41,7 @@ async fn main() {
     let mut printed = false;
     let mut total_comparisons = 0;
     let mut sorts_in_a_row = 0;
+    let start_time = get_time();
     loop {
         for i in 0..NUM_NUMBERS {
             draw_rectangle(
@@ -53,8 +54,8 @@ async fn main() {
         }
         time_passed += get_frame_time();
         if time_passed >= TIME_DELAY && !sorted{
-            // (numbers, colors, index_1, index_2, swaps, total_comparisons, sorts_in_a_row) = bubble_sort(numbers, colors, index_1, index_2, swaps, total_comparisons, sorts_in_a_row);
-            (numbers, colors, index_1, index_2, swaps, last_element, total_comparisons) = optimized_bubble_sort(numbers, colors, index_1, index_2, swaps, last_element, total_comparisons);
+            // (index_1, index_2, swaps, total_comparisons, sorts_in_a_row) = bubble_sort(&mut numbers, &mut colors, index_1, index_2, swaps, total_comparisons, sorts_in_a_row);
+            (index_1, index_2, swaps, last_element, total_comparisons) = optimized_bubble_sort(&mut numbers, &mut colors, index_1, index_2, swaps, last_element, total_comparisons);
             if last_element == NUM_NUMBERS - 1 || sorts_in_a_row == NUM_NUMBERS - 1{
                 sorted = true;
             }
@@ -65,54 +66,56 @@ async fn main() {
             draw_rectangle(index_2 as f32 * RECTANGLE_WIDTH, 0.0, RECTANGLE_WIDTH, SCREEN_HEIGHT, Color::from_rgba(180, 180, 180, 180));
         } else if sorted && !printed{
             printed = true;
-            println!("\nSorted in {} swaps!", swaps);
+            println!("\nTotal Swaps: {}", swaps);
             println!("Total Comparisons: {}", total_comparisons);
+            println!("Sorted in: {} s", get_time()-start_time);
         }
         next_frame().await;
     }
 }
 
-fn bubble_sort(mut numbers: [i32; NUM_NUMBERS as usize], mut colors: [Color; NUM_NUMBERS as usize], mut index_1: usize, mut index_2: usize, mut swaps: i32, mut total_comparisons: i32, mut sorts_in_a_row: i32) -> ([i32; NUM_NUMBERS as usize], [Color; NUM_NUMBERS as usize], usize, usize, i32, i32, i32){
-    let did_a_sort;
-    if swaps == -1{
-        return (numbers, colors, 0, 1, 0, 0, 0)
+fn bubble_sort(numbers: &mut [i32], colors: &mut [Color], mut index_1: usize, mut index_2: usize, mut num_swaps: i32, mut num_comparisons: i32, mut sorts_in_a_row: i32) -> (usize, usize, i32, i32, i32){
+    if num_swaps == -1{
+        return (0, 1, 0, 0, 0)
     }
+    let swapped = swap(numbers, colors, index_1, index_2);
+    sorts_in_a_row = if swapped {0} else {sorts_in_a_row + 1};
+    if swapped{
+        num_swaps += 1;
+    }
+    num_comparisons += 1;
     if index_2 == numbers.len() - 1{
-        (numbers, colors, swaps, total_comparisons, did_a_sort) = swap(numbers, colors, index_1, index_2, swaps, total_comparisons);
         index_1 = 0;
         index_2 = 1;
-        sorts_in_a_row = if did_a_sort {0} else {sorts_in_a_row + 1};
-        return (numbers, colors, index_1, index_2, swaps, total_comparisons, sorts_in_a_row)
+    } else {
+        index_1 += 1;
+        index_2 += 1;
     }
-    (numbers, colors, swaps, total_comparisons, did_a_sort) = swap(numbers, colors, index_1, index_2, swaps, total_comparisons);
-    sorts_in_a_row = if did_a_sort {0} else {sorts_in_a_row + 1};
-    (numbers, colors, index_1 + 1, index_2 + 1, swaps, total_comparisons, sorts_in_a_row)
+    (index_1, index_2, num_swaps, num_comparisons, sorts_in_a_row)
 }
 
-fn optimized_bubble_sort(mut numbers: [i32; NUM_NUMBERS as usize], mut colors: [Color; NUM_NUMBERS as usize], mut index_1: usize, mut index_2: usize, mut swaps: i32, last_element: i32, mut total_comparisons: i32) -> ([i32; NUM_NUMBERS as usize], [Color; NUM_NUMBERS as usize], usize, usize, i32, i32, i32){
-    if swaps == -1{
-        return (numbers, colors, 0, 1, 0, 0, 0)
+fn optimized_bubble_sort(numbers: &mut [i32], colors: &mut [Color], index_1: usize, index_2: usize, mut num_swaps: i32, last_element: i32, mut num_comparisons: i32) -> (usize, usize, i32, i32, i32) {
+    if num_swaps == -1 {
+        return (0, 1, 0, 0, 0)
     }
-    if index_2 == numbers.len() - 1 - last_element as usize{
-        (numbers, colors, swaps, total_comparisons, _) = swap(numbers, colors, index_1, index_2, swaps, total_comparisons);
-        index_1 = 0;
-        index_2 = 1;
-        return (numbers, colors, index_1, index_2, swaps, last_element + 1, total_comparisons)
+    let swapped = swap(numbers, colors, index_1, index_2);
+    if swapped {
+        num_swaps += 1;
     }
-    (numbers, colors, swaps, total_comparisons, _) = swap(numbers, colors, index_1, index_2, swaps, total_comparisons);
-    (numbers, colors, index_1 + 1, index_2 + 1, swaps, last_element, total_comparisons)
+    num_comparisons += 1;
+    if index_2 == numbers.len() - 1 - last_element as usize {
+        (0, 1, num_swaps, last_element + 1, num_comparisons)
+    } else {
+        (index_1 + 1, index_2 + 1, num_swaps, last_element, num_comparisons)
+    }
 }
 
-fn swap(mut numbers: [i32; NUM_NUMBERS as usize], mut colors: [Color; NUM_NUMBERS as usize], index_1: usize, index_2: usize, mut swaps: i32, total_comparisons: i32) -> ([i32; NUM_NUMBERS as usize], [Color; NUM_NUMBERS as usize], i32, i32, bool){
+fn swap(numbers: &mut [i32], colors: &mut [Color], index_1: usize, index_2: usize) -> bool {
     if numbers[index_1] > numbers[index_2]{
-        let temp_number = numbers[index_1];
-        let temp_color = colors[index_1];
-        colors[index_1] = colors[index_2];
-        colors[index_2] = temp_color;
-        numbers[index_1] = numbers[index_2];
-        numbers[index_2] = temp_number;
-        swaps += 1;
-        return (numbers, colors, swaps, total_comparisons + 1, true)
+        numbers.swap(index_1, index_2);
+        colors.swap(index_1, index_2);
+        true
+    } else {
+        false
     }
-    (numbers, colors, swaps, total_comparisons + 1, false)
 }
